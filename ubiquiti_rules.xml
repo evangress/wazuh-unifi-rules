@@ -1,0 +1,58 @@
+<!--
+    Wazuh decoders and rules for UniFi CEF and standard syslog messages
+    UniFi docs (CEF keys, event taxonomy):
+    https://help.ui.com/hc/en-us/articles/33349041044119-UniFi-System-Logs-SIEM-Integration
+
+    Scope:
+    - UniFi Gateway (UDM/UXG/USG) and UniFi Network (Switch/AP) syslog
+    - CEF-formatted logs (preferred) and common non-CEF formats
+
+    Notes:
+    - Decoder names: unifi-cef, unifi-syslog
+    - Fields normalized to Wazuh standard when possible: srcip, dstip, srcport, dstport, user, action, outcome, device, interface, reason, url, proto
+    - CEF extension keys frequently used by UniFi: src, dst, spt, dpt, dhost, shost, proto, act, outcome, msg, cs1..cs6 (with cs1Label..), rt (event time), deviceExternalId, deviceInboundInterface, deviceOutboundInterface
+    - Rule ID range reserved in this file: 100010-100399
+
+     _  __                                 _
+    | |/ /_      ____ _ _ __ __ _ ___   __| | _____   __
+    | ' /\ \ /\ / / _` | '__/ _` / __| / _` |/ _ \ \ / /
+    | . \ \ V  V / (_| | | | (_| \__ \| (_| |  __/\ V /
+    |_|\_\ \_/\_/ \__,_|_|  \__, |___(_)__,_|\___| \_/
+                            |___/
+
+    MIT License
+
+    Copyright (c) 2025 Evan Gress
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+-->
+
+<!-- Group taxonomy: unifi, network, firewall, auth, dhcp, ids, vpn, wireless, switch, system -->
+<group name="unifi,security,syslog">
+    <!-- Catch-all CEF from UniFi -->
+    <rule id="100010" level="2">
+        <regex type="pcre2">(?s)CEF:0\|Ubiquiti\|.*\|.*\|.*\|.*\|.*\|.*</regex>
+        <description>UniFi CEF Log</description>
+    </rule>
+    <rule id="100100" level="13">
+        <regex type="pcre2">(?s)UNIFIcategory=Security.*UNIFIsubCategory=Intrusion.*UNIFIrisk=high</regex>
+        <description>Intrusion Attempt Blocked - Risk = High</description>
+    </rule>
+</group>
