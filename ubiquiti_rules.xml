@@ -44,13 +44,28 @@
 
 -->
 
-<!-- Group taxonomy: unifi, network, firewall, auth, dhcp, ids, vpn, wireless, switch, system -->
-<group name="unifi,security,syslog">
+<!-- Generic -->
+<group name="syslog">
     <!-- Catch-all CEF from UniFi -->
     <rule id="100010" level="2">
         <regex type="pcre2">(?s)CEF:0\|Ubiquiti\|.*\|.*\|.*\|.*\|.*\|.*</regex>
-        <description>UniFi CEF Log</description>
+        <description>UniFi CEF SysLog</description>
     </rule>
+</group>
+
+<!-- Security, Intrusion -->
+<group name="syslog,firewall,unifi,security,ips">
+    <!-- Catch-all CEF from UniFi -->
+    <rule id="100100" level="13">
+        <field name="Event.Name">Threat Detected and Blocked</field>
+        <regex type="pcre2">(?s).*UNIFIcategory=Security.*UNIFIsubCategory=Intrusion.*UNIFIrisk=high</regex>
+        <description>Intrusion Attempt Blocked - Risk = High</description>
+    </rule>
+</group>
+
+<!-- Group taxonomy: unifi, network, firewall, auth, dhcp, ids, vpn, wireless, switch, system -->
+<group name="unifi,security,syslog">
+    
     <rule id="100100" level="13">
         <regex type="pcre2">(?s)UNIFIcategory=Security.*UNIFIsubCategory=Intrusion.*UNIFIrisk=high</regex>
         <description>Intrusion Attempt Blocked - Risk = High</description>
