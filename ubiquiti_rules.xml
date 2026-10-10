@@ -62,6 +62,14 @@
         <group>ids,attack,</group>
     </rule>
 
+    <!-- UniFi IPS events carry no sub-category or risk key; identify them by name -->
+    <rule id="100105" level="12">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">^Threat Detected</field>
+        <description>UniFi: Intrusion attempt from $(src) to $(unifi_dst_client_alias) - $(event.name)</description>
+        <group>ids,attack,</group>
+    </rule>
+
     <rule id="100101" level="10">
         <if_sid>100010</if_sid>
         <field name="unifi_category">^Security$</field>
@@ -73,7 +81,7 @@
     <rule id="100102" level="10">
         <if_sid>100010</if_sid>
         <field name="event.name" type="pcre2">(?i)honeypot</field>
-        <description>UniFi: Honeypot triggered - $(event.name)</description>
+        <description>UniFi: Honeypot triggered by $(unifi_client_alias) on $(unifi_device_name)</description>
         <group>ids,attack,</group>
     </rule>
 
@@ -117,6 +125,31 @@
         <if_sid>100010</if_sid>
         <field name="event.name" type="pcre2">(?i)\boffline\b|disconnected from controller</field>
         <description>UniFi: Device offline - $(event.name)</description>
+    </rule>
+
+    <!-- Level 5 ties with fallback 100392 (UniFi sends severity 4); on a tie the earlier rule wins -->
+    <rule id="100302" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Device Updated$</field>
+        <description>UniFi: $(unifi_device_name) updated from $(unifi_device_prior_version) to $(unifi_device_version) ($(unifi_update_trigger))</description>
+        <group>config_changed,</group>
+    </rule>
+
+    <!-- Controller application updates (UniFi Network, and presumably other UniFi apps) -->
+    <rule id="100303" level="5">
+        <if_sid>100010</if_sid>
+        <field name="unifi_category">^Software Updates$</field>
+        <field name="unifi_application" type="pcre2">.</field>
+        <description>UniFi: $(unifi_application) updated from $(unifi_application_prior_version) to $(unifi_application_version)</description>
+        <group>config_changed,</group>
+    </rule>
+
+    <!-- An AP falling back to a wireless (mesh) uplink often means its wired uplink was lost.
+         Level 10 ties with fallback 100391 (UniFi sends severity 7); on a tie the earlier rule wins. -->
+    <rule id="100304" level="10">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^AP Meshed$</field>
+        <description>UniFi: $(unifi_device_name) meshed to parent $(unifi_mesh_parent_device_name)</description>
     </rule>
 
     <!-- Severity-based fallbacks for anything not matched above -->
