@@ -1,16 +1,16 @@
 <!--
-    Wazuh decoders and rules for UniFi CEF and standard syslog messages
+    Wazuh rules for UniFi CEF syslog messages
+    Requires the "ubiquiti" decoder from https://github.com/evangress/wazuh-unifi-decoder
     UniFi docs (CEF keys, event taxonomy):
     https://help.ui.com/hc/en-us/articles/33349041044119-UniFi-System-Logs-SIEM-Integration
 
-    Scope:
-    - UniFi Gateway (UDM/UXG/USG) and UniFi Network (Switch/AP) syslog
-    - CEF-formatted logs (preferred) and common non-CEF formats
-
     Notes:
-    - Decoder names: unifi-cef, unifi-syslog
-    - Fields normalized to Wazuh standard when possible: srcip, dstip, srcport, dstport, user, action, outcome, device, interface, reason, url, proto
-    - CEF extension keys frequently used by UniFi: src, dst, spt, dpt, dhost, shost, proto, act, outcome, msg, cs1..cs6 (with cs1Label..), rt (event time), deviceExternalId, deviceInboundInterface, deviceOutboundInterface
+    - All rules hang off 100010, which matches anything decoded by the "ubiquiti" decoder.
+    - Wazuh tries sibling rules from highest level to lowest, not in file order. A rule that
+      should lower the level of a broader match must be its child (see 100103 under 100104).
+      A high CEF severity (100390/100391) therefore wins over a lower-level specific rule.
+    - UniFi CEF severity (event.severity) is mapped to Wazuh levels:
+      0-3 -> 2 (archived, not alerted), 4-6 -> 5, 7-8 -> 10, 9-10 -> 12
     - Rule ID range reserved in this file: 100010-100399
 
      _  __                                 _
@@ -44,30 +44,98 @@
 
 -->
 
-<!-- Generic -->
-<group name="syslog">
-    <!-- Catch-all CEF from UniFi -->
+<group name="unifi,syslog,">
+
+    <!-- Base rule: every UniFi CEF event. Level 2 keeps routine events out of alerts. -->
     <rule id="100010" level="2">
-        <regex type="pcre2">(?s)CEF:0\|Ubiquiti\|.*\|.*\|.*\|.*\|.*\|.*</regex>
-        <description>UniFi CEF SysLog</description>
+        <decoded_as>ubiquiti</decoded_as>
+        <description>UniFi: $(event.name)</description>
     </rule>
-</group>
 
-<!-- Security, Intrusion -->
-<group name="syslog,firewall,unifi,security,ips">
-    <!-- Catch-all CEF from UniFi -->
+    <!-- Security -->
     <rule id="100100" level="13">
-        <field name="Event.Name">Threat Detected and Blocked</field>
-        <regex type="pcre2">(?s).*UNIFIcategory=Security.*UNIFIsubCategory=Intrusion.*UNIFIrisk=high</regex>
-        <description>Intrusion Attempt Blocked - Risk = High</description>
+        <if_sid>100010</if_sid>
+        <field name="unifi_category">^Security$</field>
+        <field name="unifi_sub-category">^Intrusion</field>
+        <field name="unifi_risk">^high$</field>
+        <description>UniFi: Intrusion attempt, high risk - $(event.name)</description>
+        <group>ids,attack,</group>
     </rule>
-</group>
 
-<!-- Group taxonomy: unifi, network, firewall, auth, dhcp, ids, vpn, wireless, switch, system -->
-<group name="unifi,security,syslog">
-    
-    <rule id="100100" level="13">
-        <regex type="pcre2">(?s)UNIFIcategory=Security.*UNIFIsubCategory=Intrusion.*UNIFIrisk=high</regex>
-        <description>Intrusion Attempt Blocked - Risk = High</description>
+    <rule id="100101" level="10">
+        <if_sid>100010</if_sid>
+        <field name="unifi_category">^Security$</field>
+        <field name="unifi_sub-category">^Intrusion</field>
+        <description>UniFi: Intrusion attempt - $(event.name)</description>
+        <group>ids,</group>
     </rule>
+
+    <rule id="100102" level="10">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">(?i)honeypot</field>
+        <description>UniFi: Honeypot triggered - $(event.name)</description>
+        <group>ids,attack,</group>
+    </rule>
+
+    <rule id="100104" level="7">
+        <if_sid>100010</if_sid>
+        <field name="unifi_category">^Security$</field>
+        <description>UniFi: Security event - $(event.name)</description>
+    </rule>
+
+    <!-- Child of 100104 so it can lower the level: sibling rules are tried highest level first -->
+    <rule id="100103" level="5">
+        <if_sid>100104</if_sid>
+        <field name="unifi_sub-category">^Firewall</field>
+        <description>UniFi: Firewall - $(event.name)</description>
+        <group>firewall,</group>
+    </rule>
+
+    <!-- Admin activity and configuration -->
+    <rule id="100200" level="3">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">^Admin Accessed</field>
+        <description>UniFi: $(unifi_admin) accessed UniFi via $(unifi_access_method) from $(src)</description>
+        <group>authentication_success,</group>
+    </rule>
+
+    <rule id="100201" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Config Modified$</field>
+        <description>UniFi: $(unifi_admin) modified $(unifi_settings_section) settings ($(unifi_settings_entry))</description>
+        <group>config_changed,</group>
+    </rule>
+
+    <!-- Internet and devices -->
+    <rule id="100300" level="8">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">(?i)failover|internet (?:outage|down)|wan .*(?:down|offline)</field>
+        <description>UniFi: WAN/Internet issue - $(event.name)</description>
+    </rule>
+
+    <rule id="100301" level="7">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">(?i)\boffline\b|disconnected from controller</field>
+        <description>UniFi: Device offline - $(event.name)</description>
+    </rule>
+
+    <!-- Severity-based fallbacks for anything not matched above -->
+    <rule id="100390" level="12">
+        <if_sid>100010</if_sid>
+        <field name="event.severity" type="pcre2">^(?:9|10)$</field>
+        <description>UniFi: High severity event - $(event.name)</description>
+    </rule>
+
+    <rule id="100391" level="10">
+        <if_sid>100010</if_sid>
+        <field name="event.severity" type="pcre2">^[78]$</field>
+        <description>UniFi: Elevated severity event - $(event.name)</description>
+    </rule>
+
+    <rule id="100392" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.severity" type="pcre2">^[4-6]$</field>
+        <description>UniFi: $(event.name)</description>
+    </rule>
+
 </group>
