@@ -70,6 +70,13 @@
         <group>ids,attack,</group>
     </rule>
 
+    <rule id="100106" level="10">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^WiFi Impersonation Detected$</field>
+        <description>UniFi: Rogue AP impersonating SSID $(unifi_wifi_name) (BSSID $(unifi_bssid), channel $(unifi_wifi_channel)), seen by $(unifi_detected_by_ap_and_signal_strength)</description>
+        <group>ids,wireless,</group>
+    </rule>
+
     <rule id="100101" level="10">
         <if_sid>100010</if_sid>
         <field name="unifi_category">^Security$</field>
@@ -100,9 +107,11 @@
     </rule>
 
     <!-- Admin activity and configuration -->
-    <rule id="100200" level="3">
+    <!-- Real controllers name event 544 "Network Accessed"; UniFi's docs call it "Admin Accessed UniFi Network".
+         Level 5 because UniFi sends severity 4 (fallback 100392 is level 5). -->
+    <rule id="100200" level="5">
         <if_sid>100010</if_sid>
-        <field name="event.name" type="pcre2">^Admin Accessed</field>
+        <field name="event.name" type="pcre2">^(?:Admin|Network) Accessed</field>
         <description>UniFi: $(unifi_admin) accessed UniFi via $(unifi_access_method) from $(src)</description>
         <group>authentication_success,</group>
     </rule>
@@ -114,17 +123,118 @@
         <group>config_changed,</group>
     </rule>
 
-    <!-- Internet and devices -->
-    <rule id="100300" level="8">
+    <rule id="100202" level="5">
         <if_sid>100010</if_sid>
-        <field name="event.name" type="pcre2">(?i)failover|internet (?:outage|down)|wan .*(?:down|offline)</field>
-        <description>UniFi: WAN/Internet issue - $(event.name)</description>
+        <field name="event.name">^Config Created$</field>
+        <description>UniFi: $(unifi_admin) created $(unifi_settings_section) "$(unifi_settings_entry)"</description>
+        <group>config_changed,</group>
     </rule>
 
-    <rule id="100301" level="7">
+    <rule id="100203" level="5">
         <if_sid>100010</if_sid>
-        <field name="event.name" type="pcre2">(?i)\boffline\b|disconnected from controller</field>
-        <description>UniFi: Device offline - $(event.name)</description>
+        <field name="event.name">^Config Removed$</field>
+        <description>UniFi: $(unifi_admin) removed $(unifi_settings_section) "$(unifi_settings_entry)"</description>
+        <group>config_changed,</group>
+    </rule>
+
+    <!-- Higher level than 100201-100203, so it wins for firewall changes -->
+    <rule id="100204" level="7">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">^Config (?:Created|Modified|Removed)$</field>
+        <field name="unifi_settings_section" type="pcre2">^Firewall</field>
+        <description>UniFi: Firewall policy "$(unifi_settings_entry)" changed by $(unifi_admin) from $(src) ($(event.name))</description>
+        <group>config_changed,firewall,</group>
+    </rule>
+
+    <!-- Internet and WAN
+         UniFi sends a fixed severity per event type. Each rule's level is at least the
+         fallback level for that severity, and the rules sit above the fallbacks, so the
+         specific rule wins (higher level first; on a tie the earlier rule wins). -->
+    <rule id="100300" level="8">
+        <if_sid>100010</if_sid>
+        <field name="event.name" type="pcre2">(?i)failover</field>
+        <description>UniFi: WAN failover - $(event.name)</description>
+    </rule>
+
+    <rule id="100310" level="12">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Internet Down$</field>
+        <description>UniFi: Internet down on $(unifi_wan_id) ($(unifi_wan_isp), port $(unifi_wan_port))</description>
+    </rule>
+
+    <rule id="100311" level="12">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Multiple Internet Disconnections$</field>
+        <description>UniFi: $(unifi_wan_id) ($(unifi_wan_isp)) went down $(cnt) times in 24h, reported duration $(unifi_reported_duration)</description>
+    </rule>
+
+    <rule id="100312" level="7">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Temporary Internet Disconnection$</field>
+        <description>UniFi: $(unifi_wan_id) ($(unifi_wan_isp)) briefly disconnected for $(unifi_reported_duration)</description>
+    </rule>
+
+    <rule id="100313" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Internet Restored$</field>
+        <description>UniFi: Internet restored on $(unifi_wan_id) ($(unifi_wan_isp)) after $(unifi_reported_duration)</description>
+    </rule>
+
+    <rule id="100314" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^High Latency Detected$</field>
+        <description>UniFi: High latency on $(unifi_wan_id) ($(unifi_wan_isp)): $(unifi_wan_latency) ms</description>
+    </rule>
+
+    <rule id="100315" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Packet Loss Detected$</field>
+        <description>UniFi: Packet loss on $(unifi_wan_id) ($(unifi_wan_isp))</description>
+    </rule>
+
+    <!-- UniFi devices (same level convention as above) -->
+    <rule id="100301" level="10">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Device Offline$</field>
+        <description>UniFi: $(unifi_device_name) ($(unifi_device_model), $(unifi_device_ip)) went offline</description>
+    </rule>
+
+    <rule id="100305" level="12">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Multiple Devices Offline$</field>
+        <description>UniFi: $(cnt) devices offline: $(unifi_device_list)</description>
+    </rule>
+
+    <rule id="100306" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Multiple Devices Reconnected$</field>
+        <description>UniFi: $(cnt) devices reconnected: $(unifi_device_list)</description>
+    </rule>
+
+    <rule id="100320" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Device Adopted$</field>
+        <description>UniFi: $(unifi_admin) adopted $(unifi_device_name) ($(unifi_device_model), $(unifi_device_mac))</description>
+        <group>config_changed,</group>
+    </rule>
+
+    <!-- An unmanaged UniFi device appeared on the network -->
+    <rule id="100321" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Device Ready for Adoption$</field>
+        <description>UniFi: Unadopted device on network: $(unifi_device_name) ($(unifi_device_model), $(unifi_device_ip), $(unifi_device_mac))</description>
+    </rule>
+
+    <rule id="100322" level="3">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^Device Reconnected$</field>
+        <description>UniFi: $(unifi_device_name) reconnected after $(unifi_reported_duration)</description>
+    </rule>
+
+    <rule id="100307" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^AP Stopped Mesh$</field>
+        <description>UniFi: $(unifi_device_name) stopped meshing to $(unifi_prior_mesh_parent_device_name)</description>
     </rule>
 
     <!-- Level 5 ties with fallback 100392 (UniFi sends severity 4); on a tie the earlier rule wins -->
