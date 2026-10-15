@@ -39,4 +39,4 @@ UniFi IPS events ("Threat Detected and Blocked") carry no `UNIFIsubCategory` or 
 
 ## Repo notes
 
-`.gitignore` ignores every subdirectory (`*/`); add a `!dir/` exception before creating one. The tracked `.idea/` files predate that rule.
+`.gitignore` ignores every subdirectory (`*/`); add a `!dir/` exception before creating one. IDE files (`.idea/`) are untracked and ignored.
