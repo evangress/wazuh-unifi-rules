@@ -10,6 +10,8 @@ Works with any device that runs UniFi Network and exports logs through **Integra
 
 These rules need the `ubiquiti` decoder from the companion repo **[wazuh-unifi-decoder](https://github.com/evangress/wazuh-unifi-decoder)**. Install both.
 
+📖 **Docs site with install guide, full rule table and FAQ: <https://evangress.github.io/wazuh-unifi-decoder/>**
+
 ## What it alerts on
 
 | Area | Events | Wazuh level |

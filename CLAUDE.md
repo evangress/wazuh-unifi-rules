@@ -39,4 +39,6 @@ UniFi IPS events ("Threat Detected and Blocked") carry no `UNIFIsubCategory` or 
 
 ## Repo notes
 
+The rule table on the docs site (`../wazuh-unifi-decoder/docs/index.html`, https://evangress.github.io/wazuh-unifi-decoder/) lists rule IDs and levels; update it when rules change.
+
 `.gitignore` ignores every subdirectory (`*/`); add a `!dir/` exception before creating one. IDE files (`.idea/`) are untracked and ignored.
