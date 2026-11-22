@@ -23,6 +23,8 @@ These rules need the `ubiquiti` decoder from the companion repo **[wazuh-unifi-d
 | Internet / WAN | Internet down, repeated disconnections, failover, high latency, packet loss, restored | 5–12 |
 | Devices | Device offline, multiple devices offline, adopted, unadopted device on network, mesh changes | 3–12 |
 | Updates | Firmware and UniFi application updates | 5 |
+| DNS filtering (device syslog) | Content-filter blocks (3); 30 blocks for one client in 10 minutes (8); ad blocks stored without alerting (2) | 2–8 |
+| Device syslog | DHCP leases stored (2); gateway, access point and switch debug output decoded but never alerted (0) | 0–2 |
 | Anything else | Mapped from UniFi's own CEF severity: 9–10 → 12, 7–8 → 10, 4–6 → 5 | 5–12 |
 
 Routine client connect, disconnect and roam events are stored at level 2, so they are searchable but don't alert. Alerts carry the `unifi` group, and security, authentication and config-change rules add the standard Wazuh groups (`ids`, `attack`, `firewall`, `authentication_success`, `config_changed`) so they show up in the built-in dashboards.
