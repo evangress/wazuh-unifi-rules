@@ -282,3 +282,73 @@
     </rule>
 
 </group>
+
+<!--
+  UniFi device syslog (not CEF). Needs the ubiquiti-coredns, ubiquiti-dhcp,
+  ubiquiti-syslog and ubiquiti-device decoders from wazuh-unifi-decoder.
+  IDs: 100110-100113 DNS filtering (security), 100330-100334 device syslog.
+  Levels below 3 are stored (archives) but do not alert.
+-->
+<group name="unifi,syslog,">
+
+    <!-- DNS filtering on the gateway (coredns) -->
+    <rule id="100110" level="2">
+        <decoded_as>ubiquiti-coredns</decoded_as>
+        <description>UniFi DNS: $(unifi_dns_type) $(unifi_dns_domain) for $(srcip)</description>
+        <group>dns,</group>
+    </rule>
+
+    <rule id="100111" level="2">
+        <if_sid>100110</if_sid>
+        <field name="unifi_dns_type">^dnsAdBlock$</field>
+        <description>UniFi DNS: ad domain $(unifi_dns_domain) blocked for $(srcip)</description>
+        <group>dns,</group>
+    </rule>
+
+    <rule id="100112" level="3">
+        <if_sid>100110</if_sid>
+        <field name="unifi_dns_type">^contentFilteringBlock$</field>
+        <description>UniFi DNS: content filter blocked $(unifi_dns_domain) ($(unifi_dns_category)) for $(srcip)</description>
+        <group>dns,</group>
+    </rule>
+
+    <rule id="100113" level="8" frequency="30" timeframe="600" ignore="600">
+        <if_matched_sid>100112</if_matched_sid>
+        <same_source_ip />
+        <description>UniFi DNS: many content-filter blocks for $(srcip) in 10 minutes</description>
+        <group>dns,</group>
+    </rule>
+
+    <!-- DHCP (dnsmasq on the gateway) -->
+    <rule id="100330" level="0">
+        <decoded_as>ubiquiti-dhcp</decoded_as>
+        <description>UniFi DHCP: $(unifi_dhcp_message)</description>
+    </rule>
+
+    <rule id="100331" level="2">
+        <if_sid>100330</if_sid>
+        <field name="unifi_dhcp_message">^DHCPACK$</field>
+        <description>UniFi DHCP: $(srcip) leased to $(unifi_client_mac) $(unifi_client_hostname)</description>
+    </rule>
+
+    <!-- Gateway daemons and device debug output: decoded, never alerted -->
+    <rule id="100332" level="0">
+        <decoded_as>ubiquiti-syslog</decoded_as>
+        <description>UniFi gateway syslog</description>
+    </rule>
+
+    <rule id="100333" level="0">
+        <decoded_as>ubiquiti-device</decoded_as>
+        <description>UniFi device syslog: $(unifi_device_process)</description>
+    </rule>
+
+    <!-- Access point and switch syslog that the stock symantec-av decoder takes
+         (see ubiquiti-device in the decoder repo). Child of stock rule 7300 so
+         that only these lines are relabelled. -->
+    <rule id="100334" level="0">
+        <if_sid>7300</if_sid>
+        <regex type="pcre2">^[0-9a-f]{12},[^:\s]+: </regex>
+        <description>UniFi device syslog (decoded as symantec-av)</description>
+    </rule>
+
+</group>
