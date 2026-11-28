@@ -115,6 +115,16 @@
         <group>firewall,</group>
     </rule>
 
+    <!-- New WiFi Client Connected (event 412, UniFi Network 11.x): a device this network has never seen
+         before joined Wi-Fi. UniFi sends severity 3, below the fallbacks, so without this rule it stays
+         at base level 2 and never reaches the indexer. -->
+    <rule id="100108" level="5">
+        <if_sid>100010</if_sid>
+        <field name="event.name">^New WiFi Client Connected$</field>
+        <description>UniFi: New device $(unifi_client_alias) ($(unifi_client_mac)) joined $(unifi_wifi_name) via $(unifi_connected_to_device_name)</description>
+        <group>new_client,wireless,</group>
+    </rule>
+
     <!-- Admin activity and configuration -->
     <!-- Real controllers name event 544 "Network Accessed"; UniFi's docs call it "Admin Accessed UniFi Network".
          Level 5 because UniFi sends severity 4 (fallback 100392 is level 5). -->
